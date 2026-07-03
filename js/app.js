@@ -202,6 +202,39 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ---------- Liste des pings (carte + journal détaillé) ----------
+
+function formatPingPosition(ping) {
+  const lat = ping.endLat ?? ping.startLat;
+  const lng = ping.endLng ?? ping.startLng;
+  if (lat == null || lng == null) return 'Aucune position captée';
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function buildPingRow(ping) {
+  const row = document.createElement('div');
+  row.className = 'ping-row';
+  const time = new Date(ping.sentAt).toLocaleTimeString('fr-FR');
+  const latencyClass = ping.success ? 'ping-row__latency--ok' : 'ping-row__latency--fail';
+  const latencyText = ping.success ? `${ping.elapsedMs} ms` : 'Échec';
+
+  row.innerHTML = `
+    <span class="ping-row__time">${time}</span>
+    <span class="ping-row__pos">${escapeHtml(formatPingPosition(ping))}</span>
+    <span class="ping-row__latency ${latencyClass}">${latencyText}</span>
+  `;
+  return row;
+}
+
+function renderPingList(container, pings) {
+  if (pings.length === 0) {
+    container.innerHTML = '<div class="empty-state">Aucun ping pour le moment.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  pings.forEach((ping) => container.appendChild(buildPingRow(ping)));
+}
+
 // ---------- Démarrage / arrêt d'un enregistrement ----------
 
 function describeGeoError(err) {
@@ -238,6 +271,8 @@ document.getElementById('btnStartTrip').addEventListener('click', async () => {
 
   if (!recordMapView) recordMapView = new MapView('map');
   recordMapView.clear();
+  const pingListEl = document.getElementById('pingList');
+  pingListEl.innerHTML = '';
 
   recorder = new Recorder({
     settings,
@@ -247,6 +282,8 @@ document.getElementById('btnStartTrip').addEventListener('click', async () => {
       const okCount = allPings.filter((p) => p.success).length;
       document.getElementById('recordStatus').textContent =
         `${allPings.length} pings — ${okCount}/${allPings.length} réussis — dernier : ${ping.success ? ping.elapsedMs + ' ms' : 'échec'}`;
+      renderPingList(pingListEl, allPings);
+      pingListEl.scrollTop = pingListEl.scrollHeight;
     },
     onStatus: (status) => {
       if (status.type === 'error' || status.type === 'warning') {
@@ -277,6 +314,8 @@ async function loadReview(tripId) {
   currentReviewTripId = tripId;
   resetDeleteFromReviewButton();
   document.getElementById('reviewSummary').textContent = 'Chargement…';
+  const pingListEl = document.getElementById('pingListReview');
+  pingListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
   if (!reviewMapView) reviewMapView = new MapView('mapReview');
   reviewMapView.clear();
 
@@ -286,8 +325,10 @@ async function loadReview(tripId) {
     const summary = tripSummary(pings, settings);
     document.getElementById('reviewSummary').textContent =
       `${pings.length} pings — 🟢 ${summary.percentages.green}% · 🟡 ${summary.percentages.yellow}% · 🟠 ${summary.percentages.orange}% · 🔴 ${summary.percentages.red}%`;
+    renderPingList(pingListEl, pings);
   } catch (err) {
     document.getElementById('reviewSummary').textContent = `Erreur : ${err.message}`;
+    pingListEl.innerHTML = '';
   }
 }
 

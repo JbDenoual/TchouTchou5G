@@ -324,6 +324,49 @@ label {
 .dot--orange { background: var(--orange); }
 .dot--red { background: var(--red); }
 
+/* ---------- Liste des pings ---------- */
+
+.ping-list {
+  flex: 0 0 auto;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.ping-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  font-size: 12.5px;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.ping-row:first-child { border-top: none; }
+
+.ping-row__time {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  width: 60px;
+}
+
+.ping-row__pos {
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ping-row__latency {
+  flex-shrink: 0;
+  font-weight: 550;
+}
+.ping-row__latency--ok { color: var(--green); }
+.ping-row__latency--fail { color: var(--red); }
+
 /* ---------- Trip list ---------- */
 
 .trip-row {
