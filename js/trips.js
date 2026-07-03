@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { outboxRemoveByTripId } from './db.js';
 
 export function newTripId() {
   return crypto.randomUUID();
@@ -34,7 +35,11 @@ export async function getTrip(tripId) {
 }
 
 // La suppression du trajet entraîne celle de ses pings (on delete cascade en base).
+// On purge d'abord la file locale en attente : sinon une synchro tardive
+// (ex: session orpheline après rechargement du navigateur) peut ré-uploader
+// le trajet ou ses pings après coup et le faire réapparaître.
 export async function deleteTrip(tripId) {
+  await outboxRemoveByTripId(tripId);
   const { error } = await supabase.from('trips').delete().eq('id', tripId);
   if (error) throw error;
 }

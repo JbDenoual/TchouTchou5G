@@ -38,6 +38,23 @@ export class Recorder {
     };
     await outboxAdd({ outboxId: `${Date.now()}_trip_${this.tripId}`, table: 'trips', payload: trip });
 
+    await this._beginLiveTracking();
+    return this.tripId;
+  }
+
+  // Rattache le Recorder à un trajet déjà existant (ended_at encore null en
+  // base) — utilisé quand l'onglet a été rechargé/suspendu en cours de route
+  // (mise en veille du téléphone) et qu'on veut reprendre sans perdre le fil.
+  async resumeExisting(tripId, existingPings) {
+    this.tripId = tripId;
+    this.pings = existingPings ? [...existingPings] : [];
+    this.isPaused = false;
+
+    await this._beginLiveTracking();
+    return this.tripId;
+  }
+
+  async _beginLiveTracking() {
     this._startGeoWatch();
     await this._requestWakeLock();
 
@@ -47,8 +64,6 @@ export class Recorder {
     this.syncIntervalId = setInterval(() => this.syncOutbox(), SYNC_INTERVAL_MS);
     window.addEventListener('online', this._onlineHandler);
     this.syncOutbox();
-
-    return this.tripId;
   }
 
   _startPingLoop() {

@@ -50,3 +50,21 @@ export async function outboxRemove(outboxId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// Purge toute écriture en attente pour un trajet (utilisé à la suppression,
+// pour éviter qu'une synchro tardive ne ressuscite le trajet ou ses pings).
+export async function outboxRemoveByTripId(tripId) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      req.result
+        .filter((e) => (e.table === 'trips' ? e.payload.id === tripId : e.payload.trip_id === tripId))
+        .forEach((e) => store.delete(e.outboxId));
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}

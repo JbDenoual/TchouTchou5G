@@ -66,6 +66,13 @@ export class MapView {
     const pos = pointOf(ping);
     if (pos) this.map.panTo(pos, { animate: true });
   }
+
+  // Leaflet calcule sa taille à la création : si le conteneur était encore
+  // caché (display:none) à ce moment-là, la carte ne s'affiche qu'à moitié.
+  // À appeler juste après que l'écran devient visible.
+  invalidate() {
+    this.map.invalidateSize();
+  }
 }
 
 function pointOf(ping) {

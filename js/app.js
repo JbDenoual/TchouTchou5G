@@ -146,16 +146,23 @@ function buildTripRow(trip) {
   const row = document.createElement('div');
   row.className = 'trip-row';
   const date = new Date(trip.started_at).toLocaleString('fr-FR');
+  const inProgress = trip.ended_at == null;
 
   row.innerHTML = `
     <div class="trip-row__main">
-      <div class="trip-row__name">${escapeHtml(trip.name || 'Trajet sans nom')}</div>
+      <div class="trip-row__name">${escapeHtml(trip.name || 'Trajet sans nom')}${inProgress ? ' <span class="badge-live">En cours</span>' : ''}</div>
       <div class="trip-row__meta">${date}</div>
     </div>
     <div class="trip-row__action"></div>
   `;
 
-  row.addEventListener('click', () => navigate(`#review/${trip.id}`));
+  row.addEventListener('click', () => {
+    if (inProgress) {
+      resumeTrip(trip);
+    } else {
+      navigate(`#review/${trip.id}`);
+    }
+  });
   renderDeleteIcon(row, trip);
 
   return row;
@@ -286,18 +293,8 @@ btnPauseTrip.addEventListener('click', () => {
   }
 });
 
-document.getElementById('btnStartTrip').addEventListener('click', async () => {
-  if (!currentUser) return;
-  const name = document.getElementById('tripNameInput').value.trim();
-
-  if (!recordMapView) recordMapView = new MapView('map');
-  recordMapView.clear();
-  setPauseButtonState(false);
-  const pingListEl = document.getElementById('pingList');
-  pingListEl.innerHTML = '';
-
-  recorder = new Recorder({
-    settings,
+function buildRecordCallbacks(pingListEl) {
+  return {
     onPing: (ping, allPings) => {
       recordMapView.render(allPings, settings);
       recordMapView.panTo(ping);
@@ -313,14 +310,62 @@ document.getElementById('btnStartTrip').addEventListener('click', async () => {
       }
     },
     onPosition: (position, err) => updateGpsStatus(position, err),
-  });
+  };
+}
+
+function prepareRecordScreen() {
+  if (!recordMapView) recordMapView = new MapView('map');
+  recordMapView.clear();
+  setPauseButtonState(false);
+  const pingListEl = document.getElementById('pingList');
+  pingListEl.innerHTML = '';
+  return pingListEl;
+}
+
+document.getElementById('btnStartTrip').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const name = document.getElementById('tripNameInput').value.trim();
+  const pingListEl = prepareRecordScreen();
+
+  recorder = new Recorder({ settings, ...buildRecordCallbacks(pingListEl) });
 
   navigate('#record');
+  recordMapView.invalidate(); // la carte était cachée (display:none) à sa création
   document.getElementById('recordStatus').textContent = 'Initialisation…';
   updateGpsStatus(null, null);
 
   await recorder.start(currentUser.id, name);
 });
+
+// Reprend un trajet resté "en cours" (ended_at encore null) suite à une
+// interruption — onglet suspendu/rechargé pendant que le téléphone était en
+// veille, par exemple. On repart avec l'historique déjà enregistré.
+async function resumeTrip(trip) {
+  const pingListEl = prepareRecordScreen();
+  pingListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
+
+  let existingPings = [];
+  try {
+    existingPings = await getTripPings(trip.id);
+  } catch {
+    // on repart avec un historique local vide, la synchro rattrapera le reste
+  }
+
+  recorder = new Recorder({
+    settings: { ...settings, pingIntervalMs: trip.ping_interval_ms, pingTimeoutMs: trip.ping_timeout_ms },
+    ...buildRecordCallbacks(pingListEl),
+  });
+
+  navigate('#record');
+  recordMapView.invalidate();
+  recordMapView.render(existingPings, settings);
+  renderPingList(pingListEl, existingPings);
+  pingListEl.scrollTop = pingListEl.scrollHeight;
+  document.getElementById('recordStatus').textContent = "Reprise de l'enregistrement…";
+  updateGpsStatus(null, null);
+
+  await recorder.resumeExisting(trip.id, existingPings);
+}
 
 document.getElementById('btnStopTrip').addEventListener('click', async () => {
   if (!recorder) return;
