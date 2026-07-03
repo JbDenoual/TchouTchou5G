@@ -265,12 +265,34 @@ function updateGpsStatus(position, err) {
   el.classList.add('status-bar--warning');
 }
 
+const btnPauseTrip = document.getElementById('btnPauseTrip');
+const PAUSE_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
+const RESUME_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+
+function setPauseButtonState(paused) {
+  btnPauseTrip.innerHTML = paused ? `${RESUME_ICON} Reprendre` : `${PAUSE_ICON} Mettre en pause`;
+}
+
+btnPauseTrip.addEventListener('click', () => {
+  if (!recorder) return;
+  if (recorder.isPaused) {
+    recorder.resume();
+    setPauseButtonState(false);
+    document.getElementById('recordStatus').textContent = "Reprise de l'enregistrement…";
+  } else {
+    recorder.pause();
+    setPauseButtonState(true);
+    document.getElementById('recordStatus').textContent = 'En pause — appuie sur Reprendre pour continuer.';
+  }
+});
+
 document.getElementById('btnStartTrip').addEventListener('click', async () => {
   if (!currentUser) return;
   const name = document.getElementById('tripNameInput').value.trim();
 
   if (!recordMapView) recordMapView = new MapView('map');
   recordMapView.clear();
+  setPauseButtonState(false);
   const pingListEl = document.getElementById('pingList');
   pingListEl.innerHTML = '';
 

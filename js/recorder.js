@@ -18,12 +18,14 @@ export class Recorder {
     this.intervalId = null;
     this.syncIntervalId = null;
     this.wakeLockSentinel = null;
+    this.isPaused = false;
     this._onlineHandler = () => this.syncOutbox();
   }
 
   async start(userId, tripName) {
     this.tripId = newTripId();
     this.pings = [];
+    this.isPaused = false;
 
     const trip = {
       id: this.tripId,
@@ -40,13 +42,33 @@ export class Recorder {
     await this._requestWakeLock();
 
     this._sendPing(); // premier ping immédiat, pas d'attente de 15s
-    this.intervalId = setInterval(() => this._sendPing(), this.settings.pingIntervalMs);
+    this._startPingLoop();
 
     this.syncIntervalId = setInterval(() => this.syncOutbox(), SYNC_INTERVAL_MS);
     window.addEventListener('online', this._onlineHandler);
     this.syncOutbox();
 
     return this.tripId;
+  }
+
+  _startPingLoop() {
+    this.intervalId = setInterval(() => this._sendPing(), this.settings.pingIntervalMs);
+  }
+
+  // Suspend l'envoi de nouveaux pings sans mettre fin au trajet (le GPS et la
+  // synchro continuent de tourner, pour reprendre instantanément).
+  pause() {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+  }
+
+  resume() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    this._sendPing();
+    this._startPingLoop();
   }
 
   async stop() {

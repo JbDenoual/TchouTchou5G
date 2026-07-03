@@ -1,5 +1,7 @@
 import { colorAt } from './quality.js';
 
+const PING_POINT_RADIUS = 18; // 3x la taille initiale (6px)
+
 export class MapView {
   constructor(elementId) {
     this.map = L.map(elementId).setView([46.6, 2.3], 6); // centre France par défaut
@@ -37,11 +39,20 @@ export class MapView {
       this.segmentLayers.push(line);
     }
 
-    // point isolé si un seul ping a une position
-    if (withPos.length === 1) {
-      const marker = L.circleMarker(pointOf(withPos[0]), { radius: 6, color: '#2f9e44' }).addTo(this.map);
+    // un point à l'emplacement de chaque ping, coloré selon sa propre fenêtre glissante
+    pings.forEach((ping, i) => {
+      const pos = pointOf(ping);
+      if (!pos) return;
+      const color = colorAt(pings, i, settings);
+      const marker = L.circleMarker(pos, {
+        radius: PING_POINT_RADIUS,
+        color,
+        weight: 1,
+        fillColor: color,
+        fillOpacity: 0.9,
+      }).addTo(this.map);
       this.segmentLayers.push(marker);
-    }
+    });
 
     const bounds = L.latLngBounds(withPos.map(pointOf));
     if (!this.hasFitOnce) {
