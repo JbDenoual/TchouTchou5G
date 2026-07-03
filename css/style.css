@@ -1,0 +1,153 @@
+:root {
+  --bg: #111418;
+  --panel: #1a1e24;
+  --text: #eef1f5;
+  --muted: #8b93a1;
+  --accent: #2f9e44;
+  --danger: #e03131;
+  --border: #2a2f37;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.screen {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  overflow: auto;
+  padding: 16px;
+}
+
+.screen.active {
+  display: flex;
+}
+
+.screen-map {
+  padding: 0;
+}
+
+#map {
+  flex: 1;
+  min-height: 300px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0d0f12;
+  color: var(--text);
+  font-size: 15px;
+}
+
+button {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+button.primary { background: var(--accent); color: #06210c; }
+button.danger { background: var(--danger); color: #2b0808; }
+button.secondary { background: #2a2f37; color: var(--text); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-bar {
+  padding: 10px 16px;
+  font-size: 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.error-text { color: var(--danger); font-size: 13px; margin-top: 8px; }
+
+.trip-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.trip-item:hover { background: var(--panel); }
+
+.legend {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.legend span { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+nav.tabs {
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+nav.tabs button {
+  flex: 1;
+  margin: 0;
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+nav.tabs button.active {
+  color: var(--text);
+  border-top: 2px solid var(--accent);
+}

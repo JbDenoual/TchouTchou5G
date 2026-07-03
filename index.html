@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TchouTchou5G</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🚄 TchouTchou5G</h1>
+      <div id="userBadge" style="font-size:13px;color:var(--muted);"></div>
+    </header>
+
+    <!-- Connexion / inscription -->
+    <section id="screen-auth" class="screen">
+      <div class="card">
+        <h2>Connexion</h2>
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" />
+        <label for="authPassword">Mot de passe</label>
+        <input id="authPassword" type="password" autocomplete="current-password" />
+        <button id="btnSignIn" class="primary">Se connecter</button>
+        <button id="btnSignUp" class="secondary">Créer un compte</button>
+        <div id="authError" class="error-text"></div>
+      </div>
+    </section>
+
+    <!-- Accueil : liste des trajets -->
+    <section id="screen-home" class="screen">
+      <div class="card">
+        <label for="tripNameInput">Nom du trajet (optionnel)</label>
+        <input id="tripNameInput" type="text" placeholder="Paris – Lyon" />
+        <button id="btnStartTrip" class="primary">▶ Démarrer un enregistrement</button>
+      </div>
+      <div class="card">
+        <h2>Trajets précédents</h2>
+        <div id="tripList"></div>
+      </div>
+    </section>
+
+    <!-- Enregistrement en cours -->
+    <section id="screen-record" class="screen screen-map">
+      <div id="map"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:#2f9e44"></span>Bon</span>
+        <span><span class="dot" style="background:#f5c518"></span>Lent</span>
+        <span><span class="dot" style="background:#f08c00"></span>Instable</span>
+        <span><span class="dot" style="background:#e03131"></span>Coupé</span>
+      </div>
+      <div id="recordStatus" class="status-bar">Initialisation…</div>
+      <div style="padding:12px;">
+        <button id="btnStopTrip" class="danger" style="width:100%;">■ Arrêter l'enregistrement</button>
+      </div>
+    </section>
+
+    <!-- Revue d'un trajet passé -->
+    <section id="screen-review" class="screen screen-map">
+      <div id="mapReview" style="flex:1;"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:#2f9e44"></span>Bon</span>
+        <span><span class="dot" style="background:#f5c518"></span>Lent</span>
+        <span><span class="dot" style="background:#f08c00"></span>Instable</span>
+        <span><span class="dot" style="background:#e03131"></span>Coupé</span>
+      </div>
+      <div id="reviewSummary" class="status-bar"></div>
+      <div style="padding:12px;">
+        <button id="btnBackFromReview" class="secondary" style="width:100%;">← Retour</button>
+      </div>
+    </section>
+
+    <!-- Réglages -->
+    <section id="screen-settings" class="screen">
+      <div class="card">
+        <h2>Réglages du ping</h2>
+        <label for="setInterval">Intervalle entre pings (secondes)</label>
+        <input id="setInterval" type="number" min="5" step="1" />
+        <label for="setTimeout">Timeout par ping (secondes)</label>
+        <input id="setTimeout" type="number" min="1" step="1" />
+        <label for="setWindow">Taille de la fenêtre glissante (nb de pings)</label>
+        <input id="setWindow" type="number" min="1" step="1" />
+      </div>
+      <div class="card">
+        <h2>Seuils de couleur</h2>
+        <label for="setRed">Taux de succès max pour Rouge (%)</label>
+        <input id="setRed" type="number" min="0" max="100" step="5" />
+        <label for="setOrange">Taux de succès max pour Orange (%)</label>
+        <input id="setOrange" type="number" min="0" max="100" step="5" />
+        <label for="setYellow">Latence min pour Jaune (ms)</label>
+        <input id="setYellow" type="number" min="0" step="50" />
+      </div>
+      <button id="btnSaveSettings" class="primary">Enregistrer</button>
+      <button id="btnSignOut" class="secondary">Se déconnecter</button>
+    </section>
+
+    <nav class="tabs" id="mainTabs">
+      <button id="tabHome" data-target="screen-home">Accueil</button>
+      <button id="tabSettings" data-target="screen-settings">Réglages</button>
+    </nav>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
