@@ -9,21 +9,27 @@
 </head>
 <body>
   <div id="app">
-    <header>
-      <h1>🚄 TchouTchou5G</h1>
-      <div id="userBadge" style="font-size:13px;color:var(--muted);"></div>
+    <header class="app-header">
+      <div class="app-header__brand">
+        <span class="app-header__mark">TT5G</span>
+        <h1>TchouTchou5G</h1>
+      </div>
+      <div id="userBadge" class="app-header__user"></div>
     </header>
 
     <!-- Connexion / inscription -->
     <section id="screen-auth" class="screen">
-      <div class="card">
+      <div class="card card--form">
         <h2>Connexion</h2>
+        <p class="hint">Un seul compte, une seule fois — la session reste active sur cet appareil.</p>
         <label for="authEmail">Email</label>
-        <input id="authEmail" type="email" autocomplete="email" />
+        <input id="authEmail" class="input" type="email" autocomplete="email" />
         <label for="authPassword">Mot de passe</label>
-        <input id="authPassword" type="password" autocomplete="current-password" />
-        <button id="btnSignIn" class="primary">Se connecter</button>
-        <button id="btnSignUp" class="secondary">Créer un compte</button>
+        <input id="authPassword" class="input" type="password" autocomplete="current-password" />
+        <div class="btn-row">
+          <button id="btnSignIn" class="btn btn-primary">Se connecter</button>
+          <button id="btnSignUp" class="btn btn-ghost">Créer un compte</button>
+        </div>
         <div id="authError" class="error-text"></div>
       </div>
     </section>
@@ -32,11 +38,14 @@
     <section id="screen-home" class="screen">
       <div class="card">
         <label for="tripNameInput">Nom du trajet (optionnel)</label>
-        <input id="tripNameInput" type="text" placeholder="Paris – Lyon" />
-        <button id="btnStartTrip" class="primary">▶ Démarrer un enregistrement</button>
+        <input id="tripNameInput" class="input" type="text" placeholder="Paris – Lyon" />
+        <button id="btnStartTrip" class="btn btn-primary btn-block">
+          <svg viewBox="0 0 24 24" class="icon" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Démarrer un enregistrement
+        </button>
       </div>
-      <div class="card">
-        <h2>Trajets précédents</h2>
+      <div class="card card--flush">
+        <h2 class="card__title">Trajets précédents</h2>
         <div id="tripList"></div>
       </div>
     </section>
@@ -45,14 +54,17 @@
     <section id="screen-record" class="screen screen-map">
       <div id="map"></div>
       <div class="legend">
-        <span><span class="dot" style="background:#2f9e44"></span>Bon</span>
-        <span><span class="dot" style="background:#f5c518"></span>Lent</span>
-        <span><span class="dot" style="background:#f08c00"></span>Instable</span>
-        <span><span class="dot" style="background:#e03131"></span>Coupé</span>
+        <span class="legend__item"><span class="dot dot--green"></span>Bon</span>
+        <span class="legend__item"><span class="dot dot--yellow"></span>Lent</span>
+        <span class="legend__item"><span class="dot dot--orange"></span>Instable</span>
+        <span class="legend__item"><span class="dot dot--red"></span>Coupé</span>
       </div>
       <div id="recordStatus" class="status-bar">Initialisation…</div>
-      <div style="padding:12px;">
-        <button id="btnStopTrip" class="danger" style="width:100%;">■ Arrêter l'enregistrement</button>
+      <div class="action-bar">
+        <button id="btnStopTrip" class="btn btn-danger btn-block">
+          <svg viewBox="0 0 24 24" class="icon" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          Arrêter l'enregistrement
+        </button>
       </div>
     </section>
 
@@ -60,39 +72,46 @@
     <section id="screen-review" class="screen screen-map">
       <div id="mapReview" style="flex:1;"></div>
       <div class="legend">
-        <span><span class="dot" style="background:#2f9e44"></span>Bon</span>
-        <span><span class="dot" style="background:#f5c518"></span>Lent</span>
-        <span><span class="dot" style="background:#f08c00"></span>Instable</span>
-        <span><span class="dot" style="background:#e03131"></span>Coupé</span>
+        <span class="legend__item"><span class="dot dot--green"></span>Bon</span>
+        <span class="legend__item"><span class="dot dot--yellow"></span>Lent</span>
+        <span class="legend__item"><span class="dot dot--orange"></span>Instable</span>
+        <span class="legend__item"><span class="dot dot--red"></span>Coupé</span>
       </div>
       <div id="reviewSummary" class="status-bar"></div>
-      <div style="padding:12px;">
-        <button id="btnBackFromReview" class="secondary" style="width:100%;">← Retour</button>
+      <div class="action-bar action-bar--split">
+        <button id="btnBackFromReview" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Retour
+        </button>
+        <button id="btnDeleteFromReview" class="btn btn-danger-ghost">
+          <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>
+          Supprimer ce trajet
+        </button>
       </div>
     </section>
 
     <!-- Réglages -->
     <section id="screen-settings" class="screen">
       <div class="card">
-        <h2>Réglages du ping</h2>
+        <h2 class="card__title">Réglages du ping</h2>
         <label for="setInterval">Intervalle entre pings (secondes)</label>
-        <input id="setInterval" type="number" min="5" step="1" />
+        <input id="setInterval" class="input" type="number" min="5" step="1" />
         <label for="setTimeout">Timeout par ping (secondes)</label>
-        <input id="setTimeout" type="number" min="1" step="1" />
+        <input id="setTimeout" class="input" type="number" min="1" step="1" />
         <label for="setWindow">Taille de la fenêtre glissante (nb de pings)</label>
-        <input id="setWindow" type="number" min="1" step="1" />
+        <input id="setWindow" class="input" type="number" min="1" step="1" />
       </div>
       <div class="card">
-        <h2>Seuils de couleur</h2>
+        <h2 class="card__title">Seuils de couleur</h2>
         <label for="setRed">Taux de succès max pour Rouge (%)</label>
-        <input id="setRed" type="number" min="0" max="100" step="5" />
+        <input id="setRed" class="input" type="number" min="0" max="100" step="5" />
         <label for="setOrange">Taux de succès max pour Orange (%)</label>
-        <input id="setOrange" type="number" min="0" max="100" step="5" />
+        <input id="setOrange" class="input" type="number" min="0" max="100" step="5" />
         <label for="setYellow">Latence min pour Jaune (ms)</label>
-        <input id="setYellow" type="number" min="0" step="50" />
+        <input id="setYellow" class="input" type="number" min="0" step="50" />
       </div>
-      <button id="btnSaveSettings" class="primary">Enregistrer</button>
-      <button id="btnSignOut" class="secondary">Se déconnecter</button>
+      <button id="btnSaveSettings" class="btn btn-primary btn-block">Enregistrer</button>
+      <button id="btnSignOut" class="btn btn-ghost btn-block">Se déconnecter</button>
     </section>
 
     <nav class="tabs" id="mainTabs">

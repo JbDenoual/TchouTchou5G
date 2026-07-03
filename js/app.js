@@ -1,6 +1,6 @@
 import { signIn, signUp, signOut, getCurrentUser, onAuthStateChange } from './auth.js';
 import { getSettings, saveSettings } from './settings.js';
-import { listTrips, getTripPings, newTripId } from './trips.js';
+import { listTrips, getTripPings, deleteTrip } from './trips.js';
 import { Recorder } from './recorder.js';
 import { MapView } from './mapView.js';
 import { tripSummary } from './quality.js';
@@ -10,6 +10,7 @@ let recorder = null;
 let recordMapView = null;
 let reviewMapView = null;
 let currentUser = null;
+let currentReviewTripId = null;
 
 const screens = ['screen-auth', 'screen-home', 'screen-record', 'screen-review', 'screen-settings'];
 
@@ -43,7 +44,7 @@ document.getElementById('btnSignUp').addEventListener('click', async () => {
   try {
     await signUp(email, password);
     errBox.textContent = 'Compte créé. Si la confirmation par email est activée, vérifie ta boîte mail avant de te connecter.';
-    errBox.style.color = 'var(--muted)';
+    errBox.style.color = 'var(--text-secondary)';
   } catch (err) {
     errBox.textContent = err.message;
     errBox.style.color = '';
@@ -79,27 +80,82 @@ document.getElementById('tabSettings').addEventListener('click', () => {
 
 // ---------- Accueil / liste des trajets ----------
 
+const TRASH_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>`;
+
 async function refreshTripList() {
   const listEl = document.getElementById('tripList');
-  listEl.textContent = 'Chargement…';
+  listEl.innerHTML = '<div class="empty-state">Chargement…</div>';
   try {
     const trips = await listTrips();
     if (trips.length === 0) {
-      listEl.textContent = 'Aucun trajet enregistré pour le moment.';
+      listEl.innerHTML = '<div class="empty-state">Aucun trajet enregistré pour le moment.</div>';
       return;
     }
     listEl.innerHTML = '';
-    trips.forEach((trip) => {
-      const div = document.createElement('div');
-      div.className = 'trip-item';
-      const date = new Date(trip.started_at).toLocaleString('fr-FR');
-      div.innerHTML = `<span>${trip.name || 'Trajet sans nom'}<br><small style="color:var(--muted)">${date}</small></span>`;
-      div.addEventListener('click', () => openReview(trip));
-      listEl.appendChild(div);
-    });
+    trips.forEach((trip) => listEl.appendChild(buildTripRow(trip)));
   } catch (err) {
-    listEl.textContent = `Erreur de chargement : ${err.message}`;
+    listEl.innerHTML = `<div class="empty-state">Erreur de chargement : ${err.message}</div>`;
   }
+}
+
+function buildTripRow(trip) {
+  const row = document.createElement('div');
+  row.className = 'trip-row';
+  const date = new Date(trip.started_at).toLocaleString('fr-FR');
+
+  row.innerHTML = `
+    <div class="trip-row__main">
+      <div class="trip-row__name">${escapeHtml(trip.name || 'Trajet sans nom')}</div>
+      <div class="trip-row__meta">${date}</div>
+    </div>
+    <div class="trip-row__action"></div>
+  `;
+
+  row.addEventListener('click', () => openReview(trip));
+  renderDeleteIcon(row, trip);
+
+  return row;
+}
+
+function renderDeleteIcon(row, trip) {
+  const action = row.querySelector('.trip-row__action');
+  action.innerHTML = `<button type="button" class="btn-icon" aria-label="Supprimer ce trajet">${TRASH_ICON}</button>`;
+  action.querySelector('button').addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderDeleteConfirm(row, trip);
+  });
+}
+
+function renderDeleteConfirm(row, trip) {
+  const action = row.querySelector('.trip-row__action');
+  action.innerHTML = `
+    <div class="trip-row__confirm">
+      <button type="button" class="btn btn-ghost" data-role="cancel">Annuler</button>
+      <button type="button" class="btn btn-danger" data-role="confirm">Supprimer</button>
+    </div>
+  `;
+
+  action.querySelector('[data-role="cancel"]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderDeleteIcon(row, trip);
+  });
+
+  action.querySelector('[data-role="confirm"]').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    action.innerHTML = '<span class="trip-row__meta">Suppression…</span>';
+    try {
+      await deleteTrip(trip.id);
+      refreshTripList();
+    } catch (err) {
+      action.innerHTML = `<span class="error-text">${escapeHtml(err.message)}</span>`;
+    }
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // ---------- Démarrage / arrêt d'un enregistrement ----------
@@ -144,6 +200,8 @@ document.getElementById('btnStopTrip').addEventListener('click', async () => {
 // ---------- Revue d'un trajet ----------
 
 async function openReview(trip) {
+  currentReviewTripId = trip.id;
+  resetDeleteFromReviewButton();
   showScreen('screen-review');
   document.getElementById('reviewSummary').textContent = 'Chargement…';
   if (!reviewMapView) reviewMapView = new MapView('mapReview');
@@ -163,6 +221,36 @@ async function openReview(trip) {
 document.getElementById('btnBackFromReview').addEventListener('click', () => {
   showScreen('screen-home');
   refreshTripList();
+});
+
+const btnDeleteFromReview = document.getElementById('btnDeleteFromReview');
+const deleteFromReviewDefaultHtml = btnDeleteFromReview.innerHTML;
+
+function resetDeleteFromReviewButton() {
+  btnDeleteFromReview.innerHTML = deleteFromReviewDefaultHtml;
+  btnDeleteFromReview.classList.remove('btn-danger');
+  btnDeleteFromReview.classList.add('btn-danger-ghost');
+  btnDeleteFromReview.dataset.armed = 'false';
+}
+
+btnDeleteFromReview.addEventListener('click', async () => {
+  if (btnDeleteFromReview.dataset.armed !== 'true') {
+    btnDeleteFromReview.dataset.armed = 'true';
+    btnDeleteFromReview.textContent = 'Confirmer la suppression ?';
+    btnDeleteFromReview.classList.remove('btn-danger-ghost');
+    btnDeleteFromReview.classList.add('btn-danger');
+    return;
+  }
+  btnDeleteFromReview.disabled = true;
+  btnDeleteFromReview.textContent = 'Suppression…';
+  try {
+    await deleteTrip(currentReviewTripId);
+    showScreen('screen-home');
+    refreshTripList();
+  } catch (err) {
+    btnDeleteFromReview.disabled = false;
+    btnDeleteFromReview.textContent = `Échec : ${err.message}`;
+  }
 });
 
 // ---------- Réglages ----------

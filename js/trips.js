@@ -33,6 +33,12 @@ export async function getTrip(tripId) {
   return data;
 }
 
+// La suppression du trajet entraîne celle de ses pings (on delete cascade en base).
+export async function deleteTrip(tripId) {
+  const { error } = await supabase.from('trips').delete().eq('id', tripId);
+  if (error) throw error;
+}
+
 // Convertit une ligne Supabase (snake_case) vers le format utilisé côté app.
 function fromRow(row) {
   return {
