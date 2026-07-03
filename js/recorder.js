@@ -18,14 +18,12 @@ export class Recorder {
     this.intervalId = null;
     this.syncIntervalId = null;
     this.wakeLockSentinel = null;
-    this.isPaused = false;
     this._onlineHandler = () => this.syncOutbox();
   }
 
   async start(userId, tripName) {
     this.tripId = newTripId();
     this.pings = [];
-    this.isPaused = false;
 
     const trip = {
       id: this.tripId,
@@ -48,7 +46,6 @@ export class Recorder {
   async resumeExisting(tripId, existingPings) {
     this.tripId = tripId;
     this.pings = existingPings ? [...existingPings] : [];
-    this.isPaused = false;
 
     await this._beginLiveTracking();
     return this.tripId;
@@ -70,22 +67,9 @@ export class Recorder {
     this.intervalId = setInterval(() => this._sendPing(), this.settings.pingIntervalMs);
   }
 
-  // Suspend l'envoi de nouveaux pings sans mettre fin au trajet (le GPS et la
-  // synchro continuent de tourner, pour reprendre instantanément).
-  pause() {
-    if (this.isPaused) return;
-    this.isPaused = true;
-    clearInterval(this.intervalId);
-    this.intervalId = null;
-  }
-
-  resume() {
-    if (!this.isPaused) return;
-    this.isPaused = false;
-    this._sendPing();
-    this._startPingLoop();
-  }
-
+  // Suspend l'enregistrement (GPS, wake lock, boucle de pings) sans jamais
+  // marquer le trajet comme terminé : il reste toujours reprenable depuis
+  // l'accueil, avec son historique déjà enregistré.
   async stop() {
     clearInterval(this.intervalId);
     clearInterval(this.syncIntervalId);
@@ -93,11 +77,6 @@ export class Recorder {
     this._stopGeoWatch();
     await this._releaseWakeLock();
 
-    await outboxAdd({
-      outboxId: `${Date.now()}_tripend_${this.tripId}`,
-      table: 'trips',
-      payload: { id: this.tripId, ended_at: new Date().toISOString() },
-    });
     await this.syncOutbox();
 
     return this.tripId;
