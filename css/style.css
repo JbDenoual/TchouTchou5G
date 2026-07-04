@@ -106,7 +106,7 @@ h1, h2, h3 {
   gap: 0;
 }
 
-#map, #mapReview {
+#mapReview {
   flex: 1;
   min-height: 300px;
   background: var(--surface);
@@ -272,6 +272,19 @@ label {
 
 .status-bar--gps.status-bar--warning {
   color: var(--orange);
+}
+
+.review-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-summary-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action-bar {

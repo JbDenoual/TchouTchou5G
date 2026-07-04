@@ -1,18 +1,17 @@
 import { signIn, signUp, signOut, getCurrentUser, onAuthStateChange } from './auth.js';
 import { getSettings, saveSettings } from './settings.js';
-import { listTrips, getTripPings, deleteTrip } from './trips.js';
+import { listTrips, getTripPings, getTrip, deleteTrip } from './trips.js';
 import { Recorder } from './recorder.js';
 import { MapView } from './mapView.js';
 import { tripSummary } from './quality.js';
 
 let settings = getSettings();
 let recorder = null;
-let recordMapView = null;
 let reviewMapView = null;
 let currentUser = null;
-let currentReviewTripId = null;
+let currentTripId = null;
 
-const screens = ['screen-auth', 'screen-home', 'screen-record', 'screen-review', 'screen-settings'];
+const screens = ['screen-auth', 'screen-home', 'screen-review', 'screen-settings'];
 
 function showScreen(id) {
   screens.forEach((s) => document.getElementById(s).classList.toggle('active', s === id));
@@ -35,15 +34,9 @@ function route() {
   if (hash === '#settings') {
     loadSettingsIntoForm();
     showScreen('screen-settings');
-  } else if (hash === '#record') {
-    if (!recorder) {
-      navigate('#home', { replace: true }); // pas d'enregistrement en cours, rien à afficher ici
-      return;
-    }
-    showScreen('screen-record');
   } else if (hash.startsWith('#review/')) {
     showScreen('screen-review');
-    loadReview(hash.slice('#review/'.length));
+    loadTripDetail(hash.slice('#review/'.length));
   } else {
     showScreen('screen-home');
     refreshTripList();
@@ -61,9 +54,9 @@ function navigate(hash, { replace = false } = {}) {
 
 window.addEventListener('popstate', () => {
   // Empêche de quitter accidentellement un enregistrement en cours avec le bouton retour.
-  if (recorder && location.hash !== '#record') {
-    history.pushState(null, '', '#record');
-    document.getElementById('recordStatus').textContent = "Arrête l'enregistrement avant de changer d'écran.";
+  if (recorder && location.hash !== `#review/${recorder.tripId}`) {
+    history.pushState(null, '', `#review/${recorder.tripId}`);
+    document.getElementById('reviewSummary').textContent = "Arrête l'enregistrement avant de changer d'écran.";
     return;
   }
   route();
@@ -125,6 +118,8 @@ document.getElementById('tabSettings').addEventListener('click', () => navigate(
 // ---------- Accueil / liste des trajets ----------
 
 const TRASH_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>`;
+const PLAY_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+const STOP_ICON = `<svg viewBox="0 0 24 24" class="icon" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
 
 async function refreshTripList() {
   const listEl = document.getElementById('tripList');
@@ -146,23 +141,16 @@ function buildTripRow(trip) {
   const row = document.createElement('div');
   row.className = 'trip-row';
   const date = new Date(trip.started_at).toLocaleString('fr-FR');
-  const inProgress = trip.ended_at == null;
 
   row.innerHTML = `
     <div class="trip-row__main">
-      <div class="trip-row__name">${escapeHtml(trip.name || 'Trajet sans nom')}${inProgress ? ' <span class="badge-live">En pause</span>' : ''}</div>
+      <div class="trip-row__name">${escapeHtml(trip.name || 'Trajet sans nom')}</div>
       <div class="trip-row__meta">${date}</div>
     </div>
     <div class="trip-row__action"></div>
   `;
 
-  row.addEventListener('click', () => {
-    if (inProgress) {
-      resumeTrip(trip);
-    } else {
-      navigate(`#review/${trip.id}`);
-    }
-  });
+  row.addEventListener('click', () => navigate(`#review/${trip.id}`));
   renderDeleteIcon(row, trip);
 
   return row;
@@ -242,7 +230,7 @@ function renderPingList(container, pings) {
   pings.forEach((ping) => container.appendChild(buildPingRow(ping)));
 }
 
-// ---------- Démarrage / arrêt d'un enregistrement ----------
+// ---------- Détail d'un trajet (carte + contrôle de l'enregistrement) ----------
 
 function describeGeoError(err) {
   if (!err) return null;
@@ -272,143 +260,175 @@ function updateGpsStatus(position, err) {
   el.classList.add('status-bar--warning');
 }
 
+function updateLiveSummary(allPings, lastPing) {
+  const okCount = allPings.filter((p) => p.success).length;
+  const lastText = lastPing ? ` — dernier : ${lastPing.success ? lastPing.elapsedMs + ' ms' : 'échec'}` : '';
+  document.getElementById('reviewSummary').textContent =
+    `${allPings.length} pings — ${okCount}/${allPings.length} réussis${lastText}`;
+}
+
+function updateStaticSummary(pings) {
+  const summary = tripSummary(pings, settings);
+  document.getElementById('reviewSummary').textContent =
+    `${pings.length} pings — 🟢 ${summary.percentages.green}% · 🟡 ${summary.percentages.yellow}% · 🟠 ${summary.percentages.orange}% · 🔴 ${summary.percentages.red}%`;
+}
+
 function buildRecordCallbacks(pingListEl) {
   return {
     onPing: (ping, allPings) => {
-      recordMapView.render(allPings, settings);
-      recordMapView.panTo(ping);
-      const okCount = allPings.filter((p) => p.success).length;
-      document.getElementById('recordStatus').textContent =
-        `${allPings.length} pings — ${okCount}/${allPings.length} réussis — dernier : ${ping.success ? ping.elapsedMs + ' ms' : 'échec'}`;
+      reviewMapView.render(allPings, settings);
+      reviewMapView.panTo(ping);
+      updateLiveSummary(allPings, ping);
       renderPingList(pingListEl, allPings);
       pingListEl.scrollTop = pingListEl.scrollHeight;
     },
     onStatus: (status) => {
       if (status.type === 'error' || status.type === 'warning') {
-        document.getElementById('recordStatus').textContent = status.message;
+        document.getElementById('reviewSummary').textContent = status.message;
       }
     },
     onPosition: (position, err) => updateGpsStatus(position, err),
   };
 }
 
-function prepareRecordScreen() {
-  if (!recordMapView) recordMapView = new MapView('map');
-  recordMapView.clear();
-  const pingListEl = document.getElementById('pingList');
-  pingListEl.innerHTML = '';
-  return pingListEl;
-}
-
-document.getElementById('btnStartTrip').addEventListener('click', async () => {
-  if (!currentUser) return;
-  const name = document.getElementById('tripNameInput').value.trim();
-  const pingListEl = prepareRecordScreen();
-
-  recorder = new Recorder({ settings, ...buildRecordCallbacks(pingListEl) });
-
-  navigate('#record');
-  recordMapView.invalidate(); // la carte était cachée (display:none) à sa création
-  document.getElementById('recordStatus').textContent = 'Initialisation…';
-  updateGpsStatus(null, null);
-
-  await recorder.start(currentUser.id, name);
-});
-
-// Reprend un trajet resté "en cours" (ended_at encore null) suite à une
-// interruption — onglet suspendu/rechargé pendant que le téléphone était en
-// veille, par exemple. On repart avec l'historique déjà enregistré.
-async function resumeTrip(trip) {
-  const pingListEl = prepareRecordScreen();
-  pingListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
-
-  let existingPings = [];
-  try {
-    existingPings = await getTripPings(trip.id);
-  } catch {
-    // on repart avec un historique local vide, la synchro rattrapera le reste
+// Bascule l'apparence de l'écran selon qu'un enregistrement est actif pour
+// le trajet affiché : bouton, position GPS et suppression (désactivée tant
+// que le trajet est en cours d'enregistrement).
+function setLiveState(isLive) {
+  const btn = document.getElementById('btnToggleRecording');
+  if (isLive) {
+    btn.innerHTML = `${STOP_ICON} Arrêter l'enregistrement`;
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-danger');
+  } else {
+    btn.innerHTML = `${PLAY_ICON} Démarrer l'enregistrement`;
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-primary');
   }
-
-  recorder = new Recorder({
-    settings: { ...settings, pingIntervalMs: trip.ping_interval_ms, pingTimeoutMs: trip.ping_timeout_ms },
-    ...buildRecordCallbacks(pingListEl),
-  });
-
-  navigate('#record');
-  recordMapView.invalidate();
-  recordMapView.render(existingPings, settings);
-  renderPingList(pingListEl, existingPings);
-  pingListEl.scrollTop = pingListEl.scrollHeight;
-  document.getElementById('recordStatus').textContent = "Reprise de l'enregistrement…";
-  updateGpsStatus(null, null);
-
-  await recorder.resumeExisting(trip.id, existingPings);
+  document.getElementById('gpsStatus').style.display = isLive ? '' : 'none';
+  document.getElementById('reviewDeleteSlot').style.display = isLive ? 'none' : '';
 }
 
-document.getElementById('btnStopTrip').addEventListener('click', async () => {
-  if (!recorder) return;
-  document.getElementById('recordStatus').textContent = 'Synchronisation…';
-  await recorder.stop();
-  recorder = null;
-  navigate('#home', { replace: true });
-});
-
-// ---------- Revue d'un trajet ----------
-
-async function loadReview(tripId) {
-  currentReviewTripId = tripId;
-  resetDeleteFromReviewButton();
-  document.getElementById('reviewSummary').textContent = 'Chargement…';
-  const pingListEl = document.getElementById('pingListReview');
-  pingListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
+async function loadTripDetail(tripId) {
+  currentTripId = tripId;
   if (!reviewMapView) reviewMapView = new MapView('mapReview');
   reviewMapView.clear();
+  reviewMapView.invalidate(); // l'écran était caché (display:none) jusqu'ici
+  renderReviewDeleteIcon();
 
+  const pingListEl = document.getElementById('pingListReview');
+  const isLive = recorder && recorder.tripId === tripId;
+  setLiveState(isLive);
+
+  if (isLive) {
+    reviewMapView.render(recorder.pings, settings);
+    renderPingList(pingListEl, recorder.pings);
+    pingListEl.scrollTop = pingListEl.scrollHeight;
+    updateLiveSummary(recorder.pings);
+    return;
+  }
+
+  document.getElementById('reviewSummary').textContent = 'Chargement…';
+  pingListEl.innerHTML = '<div class="empty-state">Chargement…</div>';
   try {
     const pings = await getTripPings(tripId);
     reviewMapView.render(pings, settings);
-    const summary = tripSummary(pings, settings);
-    document.getElementById('reviewSummary').textContent =
-      `${pings.length} pings — 🟢 ${summary.percentages.green}% · 🟡 ${summary.percentages.yellow}% · 🟠 ${summary.percentages.orange}% · 🔴 ${summary.percentages.red}%`;
     renderPingList(pingListEl, pings);
+    updateStaticSummary(pings);
   } catch (err) {
     document.getElementById('reviewSummary').textContent = `Erreur : ${err.message}`;
     pingListEl.innerHTML = '';
   }
 }
 
+document.getElementById('btnStartTrip').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const name = document.getElementById('tripNameInput').value.trim();
+
+  recorder = new Recorder({ settings, ...buildRecordCallbacks(document.getElementById('pingListReview')) });
+  await recorder.start(currentUser.id, name);
+
+  navigate(`#review/${recorder.tripId}`);
+});
+
+document.getElementById('btnToggleRecording').addEventListener('click', async () => {
+  const btn = document.getElementById('btnToggleRecording');
+
+  if (recorder && recorder.tripId === currentTripId) {
+    // Arrêter : on suspend le suivi mais on reste sur cette page, le trajet
+    // reste consultable et reprenable plus tard.
+    btn.disabled = true;
+    document.getElementById('reviewSummary').textContent = 'Synchronisation…';
+    await recorder.stop();
+    recorder = null;
+    btn.disabled = false;
+    setLiveState(false);
+
+    const pings = await getTripPings(currentTripId).catch(() => []);
+    reviewMapView.render(pings, settings);
+    renderPingList(document.getElementById('pingListReview'), pings);
+    updateStaticSummary(pings);
+    return;
+  }
+
+  // Démarrer / reprendre ce trajet précis.
+  btn.disabled = true;
+  document.getElementById('reviewSummary').textContent = 'Chargement…';
+  let trip;
+  let existingPings;
+  try {
+    [trip, existingPings] = await Promise.all([getTrip(currentTripId), getTripPings(currentTripId)]);
+  } catch (err) {
+    document.getElementById('reviewSummary').textContent = `Erreur : ${err.message}`;
+    btn.disabled = false;
+    return;
+  }
+
+  recorder = new Recorder({
+    settings: { ...settings, pingIntervalMs: trip.ping_interval_ms, pingTimeoutMs: trip.ping_timeout_ms },
+    ...buildRecordCallbacks(document.getElementById('pingListReview')),
+  });
+
+  setLiveState(true);
+  updateGpsStatus(null, null);
+  reviewMapView.render(existingPings, settings);
+  renderPingList(document.getElementById('pingListReview'), existingPings);
+
+  btn.disabled = false;
+  await recorder.resumeExisting(currentTripId, existingPings);
+});
+
 document.getElementById('btnBackFromReview').addEventListener('click', () => {
   history.back();
 });
 
-const btnDeleteFromReview = document.getElementById('btnDeleteFromReview');
-const deleteFromReviewDefaultHtml = btnDeleteFromReview.innerHTML;
-
-function resetDeleteFromReviewButton() {
-  btnDeleteFromReview.innerHTML = deleteFromReviewDefaultHtml;
-  btnDeleteFromReview.classList.remove('btn-danger');
-  btnDeleteFromReview.classList.add('btn-danger-ghost');
-  btnDeleteFromReview.dataset.armed = 'false';
+function renderReviewDeleteIcon() {
+  const slot = document.getElementById('reviewDeleteSlot');
+  slot.innerHTML = `<button type="button" class="btn-icon" aria-label="Supprimer ce trajet">${TRASH_ICON}</button>`;
+  slot.querySelector('button').addEventListener('click', renderReviewDeleteConfirm);
 }
 
-btnDeleteFromReview.addEventListener('click', async () => {
-  if (btnDeleteFromReview.dataset.armed !== 'true') {
-    btnDeleteFromReview.dataset.armed = 'true';
-    btnDeleteFromReview.textContent = 'Confirmer la suppression ?';
-    btnDeleteFromReview.classList.remove('btn-danger-ghost');
-    btnDeleteFromReview.classList.add('btn-danger');
-    return;
-  }
-  btnDeleteFromReview.disabled = true;
-  btnDeleteFromReview.textContent = 'Suppression…';
-  try {
-    await deleteTrip(currentReviewTripId);
-    navigate('#home', { replace: true });
-  } catch (err) {
-    btnDeleteFromReview.disabled = false;
-    btnDeleteFromReview.textContent = `Échec : ${err.message}`;
-  }
-});
+function renderReviewDeleteConfirm() {
+  const slot = document.getElementById('reviewDeleteSlot');
+  slot.innerHTML = `
+    <div class="trip-row__confirm">
+      <button type="button" class="btn btn-ghost" data-role="cancel">Annuler</button>
+      <button type="button" class="btn btn-danger" data-role="confirm">Supprimer</button>
+    </div>
+  `;
+
+  slot.querySelector('[data-role="cancel"]').addEventListener('click', renderReviewDeleteIcon);
+
+  slot.querySelector('[data-role="confirm"]').addEventListener('click', async () => {
+    slot.innerHTML = '<span class="trip-row__meta">Suppression…</span>';
+    try {
+      await deleteTrip(currentTripId);
+      navigate('#home', { replace: true });
+    } catch (err) {
+      slot.innerHTML = `<span class="error-text">${escapeHtml(err.message)}</span>`;
+    }
+  });
+}
 
 // ---------- Réglages ----------
 
