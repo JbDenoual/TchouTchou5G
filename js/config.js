@@ -13,5 +13,6 @@ export const DEFAULT_SETTINGS = {
     redMaxSuccessRate: 0.3,
     orangeMaxSuccessRate: 0.7,
     yellowMinLatencyMs: 300,
+    orangeMinLatencyMs: 3000,
   },
 };

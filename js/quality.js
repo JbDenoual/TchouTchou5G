@@ -23,6 +23,12 @@ export function colorForWindow(windowPings, thresholds) {
   if (successRate < thresholds.redMaxSuccessRate) return COLORS.red;
   if (successRate < thresholds.orangeMaxSuccessRate) return COLORS.orange;
 
+  // Un seul ping très lent (ou en échec — son temps mesuré correspond au
+  // timeout, donc largement au-delà de ce seuil) rend la fenêtre instable,
+  // même si le taux de succès global reste correct.
+  const maxLatency = Math.max(...windowPings.map((p) => p.elapsedMs));
+  if (maxLatency > thresholds.orangeMinLatencyMs) return COLORS.orange;
+
   const successful = windowPings.filter((p) => p.success);
   const avgLatency =
     successful.reduce((sum, p) => sum + p.elapsedMs, 0) / (successful.length || 1);

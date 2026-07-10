@@ -222,6 +222,7 @@ const LATENCY_CLASS_BY_COLOR = {
 // jamais en orange à cause de pings voisins réussis.
 function pingOwnColor(ping) {
   if (!ping.success) return COLORS.red;
+  if (ping.elapsedMs > settings.thresholds.orangeMinLatencyMs) return COLORS.orange;
   return ping.elapsedMs > settings.thresholds.yellowMinLatencyMs ? COLORS.yellow : COLORS.green;
 }
 
@@ -694,6 +695,7 @@ function loadSettingsIntoForm() {
   document.getElementById('setRed').value = Math.round(settings.thresholds.redMaxSuccessRate * 100);
   document.getElementById('setOrange').value = Math.round(settings.thresholds.orangeMaxSuccessRate * 100);
   document.getElementById('setYellow').value = settings.thresholds.yellowMinLatencyMs;
+  document.getElementById('setOrangeLatency').value = settings.thresholds.orangeMinLatencyMs;
 }
 
 document.getElementById('btnSaveSettings').addEventListener('click', () => {
@@ -705,6 +707,7 @@ document.getElementById('btnSaveSettings').addEventListener('click', () => {
       redMaxSuccessRate: Number(document.getElementById('setRed').value) / 100,
       orangeMaxSuccessRate: Number(document.getElementById('setOrange').value) / 100,
       yellowMinLatencyMs: Number(document.getElementById('setYellow').value),
+      orangeMinLatencyMs: Number(document.getElementById('setOrangeLatency').value),
     },
   };
   saveSettings(settings);
