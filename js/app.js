@@ -216,6 +216,15 @@ const LATENCY_CLASS_BY_COLOR = {
   [COLORS.red]: 'ping-row__latency--red',
 };
 
+// Couleur propre à ce ping (échec/lent/bon), indépendante de ses voisins —
+// contrairement à colorAt() (fenêtre glissante, pensée pour lisser la carte
+// et le résumé), un échec doit toujours s'afficher en rouge dans la liste,
+// jamais en orange à cause de pings voisins réussis.
+function pingOwnColor(ping) {
+  if (!ping.success) return COLORS.red;
+  return ping.elapsedMs > settings.thresholds.yellowMinLatencyMs ? COLORS.yellow : COLORS.green;
+}
+
 function buildPingRow(ping, color) {
   const row = document.createElement('div');
   row.className = 'ping-row';
@@ -237,7 +246,7 @@ function renderPingList(container, pings) {
     return;
   }
   container.innerHTML = '';
-  pings.forEach((ping, i) => container.appendChild(buildPingRow(ping, colorAt(pings, i, settings))));
+  pings.forEach((ping) => container.appendChild(buildPingRow(ping, pingOwnColor(ping))));
 }
 
 // ---------- Détail d'un trajet (carte + contrôle de l'enregistrement) ----------
